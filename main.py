@@ -4,6 +4,7 @@ import PyPDF2
 import re
 import pandas as pd
 import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
 
@@ -84,34 +85,52 @@ class FedexTrackingNumberExtractor:
 
         return result
 
-
 class FedexTrackingExtractorTool:
     def __init__(self, root):
         self.root = root
         self.root.title("Fedex Tracking Number Extractor")
         self.result = {}
+        # Initialize path variable
+        self.path = ''  # Initialize self.path as an empty string
 
-        # Create a button to choose a file or folder
-        self.choose_path_button = tk.Button(self.root, text="Choose File or Folder", command=self.choose_path)
-        self.choose_path_button.pack(pady=20)
+        # Custom font
+        custom_font = ("Arial", 12, "bold")
+
+        # Create a button to choose a file
+        self.choose_file_button = tk.Button(self.root, text="Choose File", font=custom_font,command=self.choose_file)
+        self.choose_file_button.pack(pady=10)
+
+        # Create a button to choose a folder
+        self.choose_folder_button = tk.Button(self.root, text="Choose Folder", command=self.choose_folder)
+        self.choose_folder_button.pack(pady=10)
 
         # Create a label to display the chosen path
-        self.path_label = tk.Label(self.root, text="No path selected", wraplength=300)
-        self.path_label.pack(pady=10)
+        # self.path_label = tk.Label(self.root, text="No path selected", wraplength=300)
+        # self.path_label.pack(pady=10)
 
         # Create a button to extract tracking numbers
         self.extract_button = tk.Button(self.root, text="Extract Tracking Numbers", command=self.extract_data)
-        self.extract_button.pack(pady=20)
+        self.extract_button.pack(pady=10)
 
         # Create a text widget to display the results
         self.result_text = tk.Text(self.root, height=10, width=60)
         self.result_text.pack(pady=20)
 
-    def choose_path(self):
-        """Allow the user to choose a file or folder."""
-        self.path = filedialog.askdirectory() or filedialog.askopenfilename()
+    def choose_file(self):
+        """Allow the user to choose a file."""
+        self.path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])  # Filter for PDF files
         if self.path:
-            self.path_label.config(text=self.path)
+            self.path_label.config(text=f"Selected File: {self.path}")
+        else:
+            self.path_label.config(text="No valid file selected.")
+
+    def choose_folder(self):
+        """Allow the user to choose a folder."""
+        self.path = filedialog.askdirectory()  # This will allow folder selection
+        if self.path:
+            self.path_label.config(text=f"Selected Folder: {self.path}")
+        else:
+            self.path_label.config(text="No valid folder selected.")
 
     def extract_data(self):
         """Extract tracking numbers from the selected file or folder."""
@@ -120,7 +139,6 @@ class FedexTrackingExtractorTool:
             return
 
         extractor = FedexTrackingNumberExtractor(self.path)
-
         try:
             if extractor.pdf_file:
                 self.result = extractor.extract_tracking_from_file()
@@ -141,6 +159,7 @@ class FedexTrackingExtractorTool:
             df = pd.DataFrame.from_dict(self.result, orient='index', columns=['Tracking Numbers']).explode(
                 'Tracking Numbers')
             df = df.reset_index().rename(columns={'index': 'Order Number'})
+            print(df)
             self.result_text.insert(tk.END, df.to_string(index=False))
 
 
