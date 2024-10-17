@@ -42,17 +42,20 @@ class FedexTrackingNumberExtractor:
 
     # Method to process a single PDF file
     def extract_tracking_from_file(self):
+        result = {}
         if self.pdf_file:
             pdf_text = self._extract_text_from_pdf(self.pdf_file)
             order_number = self.find_order_number(pdf_text)
             tracking_numbers = self.find_tracking_numbers(pdf_text)
 
-            return {order_number: tracking_numbers}
+            result[order_number] = tracking_numbers
+            return result
         else:
             raise ValueError("No PDF file provided for extraction.")
 
     # Method to process all PDFs in the folder
     def extract_tracking_from_folder(self):
+        result = {}
         if self.folder_path:
             pdf_files = glob.glob(os.path.join(self.folder_path, "*.pdf"))
 
@@ -79,6 +82,9 @@ class FedexTrackingExtractorTool:
         self.root.title("Fedex Tracking Number Extractor")
         self.result = {}
 
+        # Initialize path variable
+        self.path = ''  # Initialize self.path as an empty string
+
         #Create a button to choose a file or folder
         self.choose_path_button = tk.Button(self.root, text = "Choose File or Folder", command=self.choose_path)
         self.choose_path_button.pack(pady=20)
@@ -95,11 +101,21 @@ class FedexTrackingExtractorTool:
         self.result_text = tk.Text(self.root, height=10, width=60)
         self.result_text.pack(pady=20)
 
-    def choose_path(self):
-        """Allow the user to choose a file or folder."""
-        self.path = filedialog.askdirectory() or filedialog.askopenfilename()
+    def choose_file(self):
+        """Allow the user to choose a file."""
+        self.path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
         if self.path:
-            self.path_label.config(text=self.path)
+            self.path_label.config(text=f"Selected File: {self.path}")
+        else:
+            self.path_label.config(text="No valid file selected.")
+
+    def choose_folder(self):
+        """Allow the user to choose a folder."""
+        self.path = filedialog.askdirectory()
+        if self.path:
+            self.path_label.config(text=f"Selected Folder: {self.path}")
+        else:
+            self.path_label.config(text="No valid folder selected.")
 
     def extract_data(self):
         """Extract tracking numbers from the selected file or folder."""
