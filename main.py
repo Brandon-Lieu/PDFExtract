@@ -3,6 +3,9 @@ import glob
 import PyPDF2
 import re
 import pandas as pd
+import tkinter as tk
+from tkinter import filedialog
+from tkinter import messagebox
 
 class FedexTrackingNumberExtractor:
     def __init__(self, path):
@@ -70,32 +73,65 @@ class FedexTrackingNumberExtractor:
 
         return result
 
+class FedexTrackingExtractorTool:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Fedex Tracking Number Extractor")
+        self.result = {}
+
+        #Create a button to choose a file or folder
+        self.choose_path_button = tk.Button(self.root, text = "Choose File or Folder", command=self.choose_path)
+        self.choose_path_button.pack(pady=20)
+
+        #Create a label to display chosen path
+        self.path_label = tk.Label(self.root, text="No path selected", wraplength=300)
+        self.path_label.pack(pady=10)
+
+        # Create a button to extract tracking numbers
+        self.extract_button = tk.Button(self.root, text="Extract Tracking Numbers", command=self.extract_data)
+        self.extract_button.pack(pady=20)
+
+        # Create a text widget to display the results
+        self.result_text = tk.Text(self.root, height=10, width=60)
+        self.result_text.pack(pady=20)
+
+    def choose_path(self):
+        """Allow the user to choose a file or folder."""
+        self.path = filedialog.askdirectory() or filedialog.askopenfilename()
+        if self.path:
+            self.path_label.config(text=self.path)
+
+    def extract_data(self):
+        """Extract tracking numbers from the selected file or folder."""
+        if not os.path.exists(self.path):
+            messagebox.showerror("Error", "Invalid path selected.")
+            return
+        extractor = FedexTrackingNumberExtractor(self.path)
+
+        if extractor.pdf_file:
+            self.result = extractor.extract_tracking_from_file()
+        elif extractor.folder_path:
+            self.result = extractor.extract_tracking_from_folder()
+
+        # Display the results in the text widget
+        self.display_results()
+
+    def display_results(self):
+        """Display the extracted tracking numbers in the result text widget."""
+        self.result_text.delete(1.0, tk.END)  # Clear previous results
+        if not self.result:
+            self.result_text.insert(tk.END, "No tracking numbers found.")
+        else:
+            df = pd.DataFrame.from_dict(self.result, orient='index', columns=['Tracking Numbers']).explode(
+                'Tracking Numbers')
+            df = df.reset_index().rename(columns={'index': 'Order Number'})
+            self.result_text.insert(tk.END, df.to_string(index=False))
+
 # Example usage
 if __name__ == "__main__":
-    result = {} #Create an empty dict
-    #path = "Trade-In Instructions - SA357783085.pdf"
-    path = "/Users/csuftitan/Library/CloudStorage/OneDrive-CalStateFullerton/Github/ReadPDF/pythonProject/Trade-In Files"
-    if os.path.exists(path):
-        print(f"The directory exists: {path}")
-    else:
-        raise ValueError(f"The directory does not exist: {path}")
-
-    # If everything is good
-    extractor = FedexTrackingNumberExtractor(path)
-
-    if extractor.pdf_file:
-        result = extractor.extract_tracking_from_file()
-    elif extractor.folder_path:
-        result = extractor.extract_tracking_from_folder()
-
-    # Create a DataFrame and explode lists into individual rows
-    df = pd.DataFrame.from_dict(result, orient='index', columns=['Tracking Numbers']).explode('Tracking Numbers')
-
-    # Reset the index to turn the 'index' into a column and rename it to 'Order Number'
-    df = df.reset_index().rename(columns={'index': 'Order Number'})
-
-    # Print the DataFrame
-    print(df)
+    root = tk.Tk()
+    app = FedexTrackingExtractorTool(root)
+    root.mainloop()
 
     #Print the Raw Dict
     #print(f"Extracted Order and Tracking Numbers: {result}")
