@@ -21,7 +21,6 @@ class FedexTrackingNumberExtractor:
             #messagebox.showerror(f"Invalid Path: {path}")
             self.pdf_file = None
             self.folder_path = None
-            return None
 
     # Private method to extract text from a PDF file
     def _extract_text_from_pdf(self, pdf_file):
@@ -36,7 +35,7 @@ class FedexTrackingNumberExtractor:
         if not tracking_numbers:
             # Think a way to implement this
             raise ValueError("No tracking number found.")
-        return [tracking_numbers.group(1)]
+        return tracking_numbers.group(1)
 
     # Method to find order numbers from the extracted text
     def find_order_number(self, text):
@@ -47,19 +46,28 @@ class FedexTrackingNumberExtractor:
         return order_number.group(1)
 
     def find_due_date(self,text):
-        due_date = re.search(r'\b(January|February|March|April|May|June|July|August|September|October|November|December)\s\d{1,2},\s\d{4}\b', text)
+        due_date = re.search(r'Be sure to ship your package by\s*(\S.*)', text)
         if not due_date:
-            raise ValueError("No order number found.")
-            return order_number.group(0)
+            raise ValueError("No due date found.")
+        return due_date.group(1)
+
+    def find_trade_in_devices(self,text):
+        trade_in_devices = re.search(r'about your\s*(.*?)\s*trade-in', text)
+        if not trade_in_devices:
+            raise ValueError("No trade in devices found.")
+        return trade_in_devices.group(1)
 
     # Method to process a single PDF file
     def extract_tracking_from_file(self):
+
         pdf_text = self._extract_text_from_pdf(self.pdf_file)
+
         order_number = self.find_order_number(pdf_text)
         tracking_numbers = self.find_tracking_numbers(pdf_text)
         due_date = self.find_due_date(pdf_text)
+        trade_in_devices = self.find_trade_in_devices(pdf_text)
 
-        self.result[order_number] = tracking_numbers
+        self.result[order_number] = [[tracking_numbers, due_date, trade_in_devices]]
 
         return self.result
 
@@ -77,10 +85,15 @@ class FedexTrackingNumberExtractor:
             order_number = self.find_order_number(pdf_text)
             tracking_numbers = self.find_tracking_numbers(pdf_text)
 
+            due_date = self.find_due_date(pdf_text)
+            trade_in_devices = self.find_trade_in_devices(pdf_text)
+
             if order_number in self.result:
-                self.result[order_number].extend(tracking_numbers)  # Append if order number already exists
+                # Append the new tracking numbers and other details if order number already exists
+                self.result[order_number].append([tracking_numbers, due_date, trade_in_devices])
             else:
-                self.result[order_number] = tracking_numbers
+                # Create a new entry with a list of list
+                self.result[order_number] = [[tracking_numbers, due_date, trade_in_devices]]
 
         return self.result
 
@@ -165,16 +178,16 @@ class FedexTrackingExtractorTool:
             # Display the formatted result in the Text widget
             self.result_text.insert(tk.END, formatted_result)
 
-    def save_results_to_file(self):
-        """Save the extracted tracking numbers to a text file."""
-        formatted_result = self.format_results()  # Get the formatted result string
-        file_path = 'tracking_numbers.txt'
-        with open(file_path, 'w') as file:
-            file.write(formatted_result)  # Write the result to the file
+    # def save_results_to_file(self):
+    #     """Save the extracted tracking numbers to a text file."""
+    #     formatted_result = self.format_results()  # Get the formatted result string
+    #     file_path = 'tracking_numbers.txt'
+    #     with open(file_path, 'w') as file:
+    #         file.write(formatted_result)  # Write the result to the file
 
     def format_output(self):
         """Format the extracted tracking numbers into a string."""
-        result_str = "Order Number    Tracking Number\n"  # Header for the table
+        result_str = "Order Number\tTracking Number\tDue Date\tTrade-In Devices\n"  # Header for the table
         result_str += "-" * 40 + "\n"  # Add a separator line
 
         if not self.result:
