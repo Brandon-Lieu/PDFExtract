@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
 
+
 class FedexTrackingNumberExtractor:
     def __init__(self, path):
         # Check if the input is a file or a folder
@@ -30,26 +31,29 @@ class FedexTrackingNumberExtractor:
             print(f"File {pdf_file} not found.")
             return ""
 
-    # Method to find tracking numbers from the extracted text
+    # Method to find tracking numbers from the extracted text (supports multiple tracking numbers)
     def find_tracking_numbers(self, text):
-        tracking_numbers = re.search(r'Tracking ID:\s*(\d{12})', text)
-        return tracking_numbers.group(1)
+        tracking_numbers = re.findall(r'Tracking ID:\s*(\d{12})',
+                                      text)  # Use findall to capture multiple tracking numbers
+        if not tracking_numbers:
+            raise ValueError("No tracking number found.")
+        return tracking_numbers
 
     # Method to find order numbers from the extracted text
     def find_order_number(self, text):
         order_number = re.search(r'Order ID:\s*(SA\d{9})', text)
+        if not order_number:
+            raise ValueError("No order number found.")
         return order_number.group(1)
 
     # Method to process a single PDF file
     def extract_tracking_from_file(self):
-        result = {}
         if self.pdf_file:
             pdf_text = self._extract_text_from_pdf(self.pdf_file)
             order_number = self.find_order_number(pdf_text)
             tracking_numbers = self.find_tracking_numbers(pdf_text)
 
-            result[order_number] = tracking_numbers
-            return result
+            return {order_number: tracking_numbers}
         else:
             raise ValueError("No PDF file provided for extraction.")
 
@@ -61,20 +65,25 @@ class FedexTrackingNumberExtractor:
 
             if not pdf_files:
                 print(f"No PDF files found in the folder: {self.folder_path}")
-                return
+                return result
 
             for pdf_file in pdf_files:
-                #print(f"Processing file: {pdf_file}")
                 pdf_text = self._extract_text_from_pdf(pdf_file)
-                order_number = self.find_order_number(pdf_text)
-                tracking_numbers = self.find_tracking_numbers(pdf_text)
+                try:
+                    order_number = self.find_order_number(pdf_text)
+                    tracking_numbers = self.find_tracking_numbers(pdf_text)
 
-                result[order_number] = tracking_numbers
-
+                    if order_number in result:
+                        result[order_number].extend(tracking_numbers)  # Append if order number already exists
+                    else:
+                        result[order_number] = tracking_numbers
+                except ValueError as e:
+                    print(f"Error processing {pdf_file}: {e}")
         else:
             raise ValueError("No folder path provided for extraction.")
 
         return result
+
 
 class FedexTrackingExtractorTool:
     def __init__(self, root):
@@ -82,14 +91,11 @@ class FedexTrackingExtractorTool:
         self.root.title("Fedex Tracking Number Extractor")
         self.result = {}
 
-        # Initialize path variable
-        self.path = ''  # Initialize self.path as an empty string
-
-        #Create a button to choose a file or folder
-        self.choose_path_button = tk.Button(self.root, text = "Choose File or Folder", command=self.choose_path)
+        # Create a button to choose a file or folder
+        self.choose_path_button = tk.Button(self.root, text="Choose File or Folder", command=self.choose_path)
         self.choose_path_button.pack(pady=20)
 
-        #Create a label to display chosen path
+        # Create a label to display the chosen path
         self.path_label = tk.Label(self.root, text="No path selected", wraplength=300)
         self.path_label.pack(pady=10)
 
@@ -101,36 +107,30 @@ class FedexTrackingExtractorTool:
         self.result_text = tk.Text(self.root, height=10, width=60)
         self.result_text.pack(pady=20)
 
-    def choose_file(self):
-        """Allow the user to choose a file."""
-        self.path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
+    def choose_path(self):
+        """Allow the user to choose a file or folder."""
+        self.path = filedialog.askdirectory() or filedialog.askopenfilename()
         if self.path:
-            self.path_label.config(text=f"Selected File: {self.path}")
-        else:
-            self.path_label.config(text="No valid file selected.")
-
-    def choose_folder(self):
-        """Allow the user to choose a folder."""
-        self.path = filedialog.askdirectory()
-        if self.path:
-            self.path_label.config(text=f"Selected Folder: {self.path}")
-        else:
-            self.path_label.config(text="No valid folder selected.")
+            self.path_label.config(text=self.path)
 
     def extract_data(self):
         """Extract tracking numbers from the selected file or folder."""
         if not os.path.exists(self.path):
             messagebox.showerror("Error", "Invalid path selected.")
             return
+
         extractor = FedexTrackingNumberExtractor(self.path)
 
-        if extractor.pdf_file:
-            self.result = extractor.extract_tracking_from_file()
-        elif extractor.folder_path:
-            self.result = extractor.extract_tracking_from_folder()
+        try:
+            if extractor.pdf_file:
+                self.result = extractor.extract_tracking_from_file()
+            elif extractor.folder_path:
+                self.result = extractor.extract_tracking_from_folder()
 
-        # Display the results in the text widget
-        self.display_results()
+            # Display the results in the text widget
+            self.display_results()
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
 
     def display_results(self):
         """Display the extracted tracking numbers in the result text widget."""
@@ -143,11 +143,9 @@ class FedexTrackingExtractorTool:
             df = df.reset_index().rename(columns={'index': 'Order Number'})
             self.result_text.insert(tk.END, df.to_string(index=False))
 
-# Example usage
+
+# Main application loop
 if __name__ == "__main__":
     root = tk.Tk()
     app = FedexTrackingExtractorTool(root)
     root.mainloop()
-
-    #Print the Raw Dict
-    #print(f"Extracted Order and Tracking Numbers: {result}")
