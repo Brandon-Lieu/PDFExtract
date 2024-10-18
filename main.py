@@ -1,3 +1,4 @@
+import csv
 import os
 import glob
 import PyPDF2
@@ -100,22 +101,31 @@ class FedexTrackingNumberExtractor:
 class FedexTrackingExtractorTool:
     def __init__(self, root):
         self.root = root
+        self.root.geometry("600x400")
         self.root.title("Fedex Tracking Number Extractor")
         # Initialize result variable
         self.result = {}
         # Initialize path variable
         self.path = ''  # Initialize self.path as an empty string
+        # Create a style to apply the custom font to all buttons
+        style = ttk.Style()
+        btn_font = ("Times New Roman", 14)
+        label_front = ("Times New Roman", 11)
+        #Style for buttons
+        style.configure("TButton", font=btn_font)
+        # Create a style for labels
+        style.configure("TLabel", font=label_front)
 
         # Create a button to choose a file (using ttk)
-        self.choose_file_button = ttk.Button(self.root, text="Choose File",command=self.choose_file)
+        self.choose_file_button = ttk.Button(self.root, text="Choose File",command=self.choose_file,width=20)
         # Create a button to choose a folder (using ttk)
-        self.choose_folder_button = ttk.Button(self.root, text="Choose Folder", command=self.choose_folder)
+        self.choose_folder_button = ttk.Button(self.root, text="Choose Folder", command=self.choose_folder, width=20)
         # Create a label to display the chosen path
         self.path_label = ttk.Label(self.root, text="No path selected", wraplength=300)
         # Create a button to extract tracking numbers
-        self.extract_button = ttk.Button(self.root, text="Extract Tracking Numbers", command=self.extract_data)
+        self.extract_button = ttk.Button(self.root, text="Extract Tracking Numbers", command=self.extract_data, width=30)
         # Create a text widget to display the results
-        self.result_text = tk.Text(self.root, height=10, width=60)
+        self.result_text = tk.Text(self.root, height=15, width=80)
 
         # Configure the grid to reduce the gap between columns
         self.root.grid_columnconfigure(0, weight=1)  # Left column (buttons)
@@ -123,17 +133,17 @@ class FedexTrackingExtractorTool:
 
         # Place widgets in the grid
         # Buttons on the left
-        self.choose_file_button.grid(row=0, column=0, padx=10, pady=10, sticky="w")
-        self.choose_folder_button.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+        self.choose_file_button.grid(row=0, column=0, padx=15, pady=15)
+        self.choose_folder_button.grid(row=1, column=0, padx=15, pady=15)
 
         # Path label on the right (row 0)
-        self.path_label.grid(row=0, column=1, padx=10, pady=10, sticky="ne")
+        self.path_label.grid(row=0, column=1, padx=10, pady=10)
 
         # Extract button on the right, below the path label (row 1)
-        self.extract_button.grid(row=1, column=1, padx=10, pady=10, sticky="ne")
+        self.extract_button.grid(row=1, column=1, padx=15, pady=15)
 
         # Output text at the bottom, spanning both columns
-        self.result_text.grid(row=2, column=0, columnspan=2, padx=10, pady=10)
+        self.result_text.grid(row=2, column=0, columnspan=2, padx=15, pady=15)
 
     def choose_file(self):
         """Allow the user to choose a file."""
@@ -175,29 +185,73 @@ class FedexTrackingExtractorTool:
             self.result_text.insert(tk.END, "No tracking numbers found.")
         else:
             formatted_result = self.format_output()
+            #Write to CSV File
+            export_to_csv = self.export_to_csv()
             # Display the formatted result in the Text widget
             self.result_text.insert(tk.END, formatted_result)
 
-    # def save_results_to_file(self):
-    #     """Save the extracted tracking numbers to a text file."""
-    #     formatted_result = self.format_results()  # Get the formatted result string
-    #     file_path = 'tracking_numbers.txt'
-    #     with open(file_path, 'w') as file:
-    #         file.write(formatted_result)  # Write the result to the file
+    def get_formatted_data(self):
+        """Helper function to extract tracking numbers and details."""
+        formatted_data = []
+
+        # If self.result is empty, return no tracking information
+        if not self.result:
+            return formatted_data  # Return empty list if no data
+
+        # Iterate through self.result to collect the data
+        for order_number, tracking_details in self.result.items():
+            for details in tracking_details:
+                tracking_number = details[0]
+                due_date = details[1]
+                trade_in_devices = details[2]
+
+                # Append the formatted row to the list
+                formatted_data.append([order_number, tracking_number, due_date, trade_in_devices])
+
+        return formatted_data
 
     def format_output(self):
         """Format the extracted tracking numbers into a string."""
-        result_str = "Order Number\tTracking Number\tDue Date\tTrade-In Devices\n"  # Header for the table
-        result_str += "-" * 40 + "\n"  # Add a separator line
+        # Define fixed widths for each column
+        col_width_order = 15
+        col_width_tracking = 20
+        col_width_due_date = 15
+        col_width_trade_in = 20
+        result_str = (
+            f"{'Order Number':<{col_width_order}} "
+            f"{'Tracking Number':<{col_width_tracking}} "
+            f"{'Due Date':<{col_width_due_date}} "
+            f"{'Trade-In Devices':<{col_width_trade_in}}\n")
+        result_str += "-" * 70 + "\n"  # Add a separator line
 
-        if not self.result:
+        # Get formatted data from the helper function
+        formatted_data = self.get_formatted_data()
+
+        if not formatted_data:
             result_str += "No tracking numbers found.\n"
         else:
-            for order_number, tracking_numbers in self.result.items():
-                # If there are multiple tracking numbers, display each on a new line
-                for tracking_number in tracking_numbers:
-                    result_str += f"{order_number:<15} {tracking_number}\n"  # Add order and tracking number
+            # Format the rows into a string
+            for data in formatted_data:
+                result_str += f"{data[0]:<15} {data[1]:<15} {data[2]:<20} {data[3]}\n"
+
         return result_str
+
+    def export_to_csv(self, filename="output.csv"):
+        """Export the extracted tracking numbers to a CSV file."""
+        # Open the CSV file for writing
+        with open(filename, mode='w', newline='') as file:
+            writer = csv.writer(file, delimiter=',')  # Create a CSV writer
+
+            # Write the header row
+            writer.writerow(["Order Number", "Tracking Number", "Due Date", "Trade-In Devices"])
+
+            # Get formatted data from the helper function
+            formatted_data = self.get_formatted_data()
+
+            # Write the data rows to the CSV file
+            writer.writerows(formatted_data)
+
+        print(f"Data has been written to {filename}")
 
 # Main application loop
 if __name__ == "__main__":
